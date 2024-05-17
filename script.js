@@ -8,56 +8,64 @@ const cx_btn_atirar = document.querySelector('.cx_btn_atirar')
 const btn_atirar = document.querySelector('.btn_atirar')
 const textoNumMortes = document.getElementById('nMorte')
 const textoNumVitorias = document.getElementById('nVitoria')
+
+let icon_Muted_Unmuted = (document.querySelector('.icon_muted-unmuted').firstElementChild)
+const img_revolver_bg = document.getElementById('img_revolver_bg')
+
 let nMortes = 0
 let nVitorias = 0
 let nBalas = 6
 let index_Cartucho
 
-// TEXTO DO NÚMERO DE MORTES E VITÓRIAS
-textoNumMortes.innerHTML = nMortes
-textoNumVitorias.innerHTML = nVitorias
+    // TEXTO DO NÚMERO DE MORTES E VITÓRIAS
+    textoNumMortes.innerHTML = nMortes
+    textoNumVitorias.innerHTML = nVitorias
 
-// CRIAÇÃO DA CAIXA CONTENDO INF E NÚMERO DE BALAS
-const cx_nBalas = document.createElement('div')
-const inf_nBalas = document.createElement('h1')
-cx_nBalas.classList.add('cx_nBalas')
-inf_nBalas.textContent = nBalas + "/6"
+    // CRIAÇÃO DA CAIXA CONTENDO INF E NÚMERO DE BALAS
+    const cx_nBalas = document.createElement('div')
+    const inf_nBalas = document.createElement('h1')
+    cx_nBalas.classList.add('cx_nBalas')
+    inf_nBalas.textContent = nBalas + "/6"
 
-// CRIAÇÃO DO BOTÃO DE RECOMEÇAR
-const btn_recomecar = document.createElement('h2')
-btn_recomecar.setAttribute('class', 'btn_recomecar')
-btn_recomecar.innerHTML = "↻"
+    // CRIAÇÃO DO BOTÃO DE RECOMEÇAR
+    const btn_recomecar = document.createElement('h2')
+    btn_recomecar.setAttribute('class', 'btn_recomecar')
+    btn_recomecar.innerHTML = "↻"
 
-// CARREGA O ARQUIVOS DE ÁUDIO
-const contextoDeAudio = new AudioContext()
-const bufferDeAudios = {}
+    // CARREGA OS ARQUIVOS DE ÁUDIO
+    const contextoDeAudio = new AudioContext()
+    const bufferDeAudios = {}
 
-    const somAmbiente = document.getElementById('som_ambiente')
-    somAmbiente.volume = 0.9
-    somAmbiente.play()
-    
-    const contextoDeAudioAmbiente = new AudioContext()
-    const audioSource = contextoDeAudioAmbiente.createMediaElementSource(somAmbiente)
-    
-    const lowPassFilter = contextoDeAudioAmbiente.createBiquadFilter()
-    lowPassFilter.type = 'lowpass'
-    lowPassFilter.frequency.value = 3500
+        // COLOCAÇÃO E FUNCIONALIDADE DO SOM AMBIENTE
+        let contextoDeAudioAmbiente, lowPassFilter
+        
+        const somAmbiente = document.getElementById('som_ambiente')
+        somAmbiente.volume = 1
+        
+            // GAMBIARRA PARA FAZER O SOM AMBIENTE SER MUTADO E DESMUTADO, E, COM EFEITO LOW-PASS FILTER
+            function gambiarra_somAmbiente() {
+                somAmbiente.play()
+                const audioSource = contextoDeAudioAmbiente.createMediaElementSource(somAmbiente)
+                
+                lowPassFilter = contextoDeAudioAmbiente.createBiquadFilter()
+                lowPassFilter.type = 'lowpass'
+                lowPassFilter.frequency.value = 8000
+            
+                audioSource.connect(lowPassFilter)
+                lowPassFilter.connect(contextoDeAudioAmbiente.destination)
+            }
+        
+        
+    // TRANSIÇÃO SUAVE (EASE) ENTRE OS VALORES DA PROPRIEDADE 'lowPassFilter.frequency.value'
+    let estaTransicionando = false
+    const duracaoTransicao = 450
 
-    audioSource.connect(lowPassFilter)
-    lowPassFilter.connect(contextoDeAudioAmbiente.destination)
 
 
 
 
 // FUNÇÕES DE INICIALIZAÇÃO E MANIPULAÇÃO DE ELEMENTOS
-function indexCartuchoFuncao() {
-    nBalas = 6
-    index_Cartucho = Math.floor(Math.random() * 6) + 1
-    // index_Cartucho = 2
-    return index_Cartucho
-}
-
-function intro() {
+const intro = function() {
     btn_atirar.style.pointerEvents = 'none'
 
     setTimeout(() => {
@@ -79,6 +87,15 @@ function intro() {
         btn_atirar.style.pointerEvents = 'all'
     }, 5000)
 }
+
+
+function indexCartuchoFuncao() {
+    nBalas = 6
+    index_Cartucho = Math.floor(Math.random() * 6) + 1
+    // index_Cartucho = 1
+    return index_Cartucho
+}
+
 
 function criacaoElementoNumBalas() {
     setTimeout(() => {
@@ -156,7 +173,34 @@ function btnRecomecarResetar() {
 
     carregarSom('sounds/Putting back roulette (closing).wav', 'putting_back_roulette')
 
+// FUNÇÃO AUX PARA INTERPOLAR LINEARMENTE ENTRE DOIS VALORES DO TRANSIENTE (LOW-PASS FILTER)
+function lerp(ini, fim, t) {
+    return ini * (1 - t) + fim * t
+}
+function comecarTransicao(valorIni, valorFim) {
+    if(estaTransicionando) return
 
+    estaTransicionando = true
+    const tempoInicial = performance.now()
+
+    function animarTransicao(duracaoAtual) {
+        const tempoDecorrido = duracaoAtual - tempoInicial
+        const t = tempoDecorrido / duracaoTransicao
+
+        if(t >= 1) {
+            lowPassFilter.frequency.value = valorFim
+            estaTransicionando = false
+            return
+        }
+
+        const valorInterpolado = lerp(valorIni, valorFim, t)
+        lowPassFilter.frequency.value = valorInterpolado
+
+        requestAnimationFrame(animarTransicao)
+    }
+
+    requestAnimationFrame(animarTransicao)
+}
 
 
 
@@ -188,25 +232,35 @@ btn_atirar.addEventListener('click', () => {
             nMortes++
             textoNumMortes.innerHTML = nMortes
             
+            tocarSom('shot_' + nBalas)
+
+            nBalas--
+            inf_nBalas.textContent = nBalas + "/6"
+
             indexCartuchoFuncao()
             btnRecomecarFadeIn()
-            tocarSom('shot_' + nBalas)
     
             btn_atirar.style.pointerEvents = 'none'
             btn_atirar.style.cursor = 'default'
             btn_atirar.style.opacity = '0.3'
 
+            comecarTransicao(lowPassFilter.frequency.value, 150)
+
         }
     }
     else if(index_Cartucho == 1) {
-        alert("Você venceu.")
+        // alert("Você venceu.")
 
         nVitorias++
         textoNumVitorias.innerHTML = nVitorias
 
+        tocarSom('blank_' + nBalas)
+
+        nBalas--
+        inf_nBalas.textContent = nBalas + "/6"
+
         indexCartuchoFuncao()
         btnRecomecarFadeIn()
-        tocarSom('blank_' + nBalas)
 
         btn_atirar.style.pointerEvents = 'none'
         btn_atirar.style.cursor = 'default'
@@ -216,13 +270,19 @@ btn_atirar.addEventListener('click', () => {
         nMortes++
         textoNumMortes.innerHTML = nMortes
         
+        tocarSom('shot_' + nBalas)
+
+        nBalas--
+        inf_nBalas.textContent = nBalas + "/6"
+        
         indexCartuchoFuncao()
         btnRecomecarFadeIn()
-        tocarSom('shot_' + nBalas)
 
         btn_atirar.style.pointerEvents = 'none'
         btn_atirar.style.cursor = 'default'
         btn_atirar.style.opacity = '0.3'
+
+        comecarTransicao(lowPassFilter.frequency.value, 150)
 
     }
 })
@@ -233,16 +293,53 @@ btn_atirar.addEventListener('mouseover', () => {
     cx_inf.style.transition = 'filter 0.625s ease'
     cx_nBalas.style.transition = 'filter 0.625s ease'
     
-    lowPassFilter.frequency.value = 250
+    img_revolver_bg.style.opacity = '0.04'
+    img_revolver_bg.style.transition = 'opacity 0.625s ease'
+
+    comecarTransicao(lowPassFilter.frequency.value, 150)
+
 })
     
 btn_atirar.addEventListener('mouseout', () => {
     cx_inf.style.filter = 'brightness(100%)'
     cx_nBalas.style.filter = 'brightness(100%)'
 
-    lowPassFilter.frequency.value = 3500
+    img_revolver_bg.style.opacity = '0.1'
+
+    comecarTransicao(lowPassFilter.frequency.value, 8000)
 })
 
 btn_recomecar.addEventListener('click', () => {
     btnRecomecarResetar()
+    comecarTransicao(lowPassFilter.frequency.value, 8000)
+})
+
+
+icon_Muted_Unmuted.addEventListener('click', () => {
+    if(!contextoDeAudioAmbiente) {
+        contextoDeAudioAmbiente = new AudioContext()
+        gambiarra_somAmbiente()
+        
+        if(icon_Muted_Unmuted.alt === "Muted") {
+            icon_Muted_Unmuted.src = "https://i.ibb.co/pJ1DV1L/Unmuted.png"
+            icon_Muted_Unmuted.alt = "Unmuted"
+            
+            somAmbiente.volume = 1
+            
+        }
+        return contextoDeAudioAmbiente // desbug da troca do icon mutado-desmutado
+    }
+
+    if(icon_Muted_Unmuted.alt === "Muted") {
+        icon_Muted_Unmuted.src = "https://i.ibb.co/pJ1DV1L/Unmuted.png"
+        icon_Muted_Unmuted.alt = "Unmuted"
+
+        somAmbiente.volume = 1
+
+    } else {
+        icon_Muted_Unmuted.src = "https://i.ibb.co/7VgQGzD/Muted.png"
+        icon_Muted_Unmuted.alt = "Muted"
+
+        somAmbiente.volume = 0
+    }
 })
