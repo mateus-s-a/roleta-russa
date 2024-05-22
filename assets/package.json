@@ -1,0 +1,10 @@
+{
+    "name": "roleta-russa",
+    "version": "1.0.0",
+    "scripts": {
+        "sass": "sass --watch scss/style.scss:css/style.css"
+    },
+    "devDependencies": {
+        "sass": "^1.32.0"
+    }
+}
